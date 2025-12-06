@@ -18,7 +18,7 @@ Can be used for simple privacy stuff, as well as to avoid issues with CD&R paylo
 Clone the repository
 
 ```
-git clone https://github.com/YossiSassi/ProtectedFile/ProtectedFile.git
+git clone https://github.com/YossiSassi/ProtectedFile
 ```
 
 Import the module
