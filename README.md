@@ -2,7 +2,12 @@
 
 ProtectedFile.psm1 is a lightweight PowerShell module designed to simplify Protecting/Unprotecting any file (PE files, .ps1, etc.) by compressing & Encrypting content using AES 256 & gzip, and a cipher base64.<Br>Uses random salt, KDF -> key+IV, and prepends salt to ciphertext.<br>
 Can be used for simple privacy stuff, as well as to avoid issues with CD&R payload entry or the occasional flagging by random EPP (AV/EDR).
+<br>
+
+The protected file also keeps low entropy (or medium, if originally packed/compressed), unlike "un-protected really-Encrypted file". See the screenshot for Entropy comparison:
 <br><br>
+![Sample results](/screenshots/screenshot_lowentropy.png) <br><br>
+<br>
 
 🚀 Features
 
