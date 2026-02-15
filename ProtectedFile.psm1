@@ -11,8 +11,9 @@ Special thanks to Eldar Azan for his feedback!
 #>
 
 ## Inner functions ##
-# Protect-String function v1.0
+# Protect-String function
 # Get plain-text string, convert string to bytes, compress, encrypt w/AES 256 and return encrypted Base64
+# v1.0 - initial function
 function Protect-String {
     param(
         [Parameter(Mandatory=$true)][string]$PlainText,
@@ -67,8 +68,9 @@ function Protect-String {
     return $encBytes
 }
 
-# UnProtect-String function v1.0
+# UnProtect-String function
 # Get ciper base64 string, decode to bytes, decrypt bytes, de-compress string and return plain-text
+# v1.0 - initial function
 function Unprotect-String {
     param(
         [Parameter(Mandatory=$true)][string]$CipherBase64,
@@ -120,7 +122,7 @@ function Unprotect-String {
 }
 
 ## Main functions ##
-# ConvertTo-ProtectedFile v1.0
+# ConvertTo-ProtectedFile v1.1
 # Protect input file and save it to output path (optional: copy protected string to clipboard)
 function ConvertTo-ProtectedFile {
 <#
@@ -131,7 +133,6 @@ Protect the input file and save it to output path (optional: copy protected stri
 ProtectedFile Module - Protect/Unprotect any file (PE files, .ps1, etc.) by compressing & Encrypting content using AES 256 & gzip, and a cipher base64. uses random salt, KDF -> key+IV, and prepends salt to ciphertext.
 Can be used for simple privacy stuff, as well as to avoid issues with CD&R payload entry or the occasional flagging by random EPP (AV/EDR).
 
-Module Version: 1.0
 Comments: yossis@protonmail.com (#Yossi_Sassi, 1nTh35h311)
 
 Main functions: ConvertTo-ProtectedFile, ConvertFrom-ProtectedFile
@@ -141,41 +142,71 @@ Inner functions:
 Protect-String - Gets plain-text string, convert string to bytes, compress, encrypt w/AES 256 and return encrypted Base64
 UnProtect-String - Gets ciper base64 string, decode to bytes, decrypt bytes, de-compress string and return plain-text
 
-.PARAMETER InputFile
+.PARAMETER InputFilePath
 Full path to the file you want to compress & encrypt. e.g. c:\temp\sourcefile.exe
+
+.PARAMETER UseClipboardInput
+Specify this switch is you want to protect the content of your copied Clipboard content instead of a file
 
 .PARAMETER ProtectedOutputfile
 Full path to the resulted encrypted file. e.g. c:\temp\out.txt
 
 .EXAMPLE
-ConvertTo-ProtectedFile -InputFile 'C:\temp\myfile.exe' -ProtectedOutputFile 'c:\temp\ProtectedFile.txt'
+ConvertTo-ProtectedFile -InputFilePath 'C:\temp\myfile.exe' -ProtectedOutputFile 'c:\temp\ProtectedFile.txt'
 
 Converts the PE file into a compressed/encrypted Base64 text file.
 
 .EXAMPLE
-ConvertTo-ProtectedFile -InputFile 'C:\temp\Myfile.txt' -ProtectedOutputFile 'c:\temp\ProtectedFile.whatever' -CopyProtectedStringToClipboard
+ConvertTo-ProtectedFile -InputFilePath 'C:\temp\Myfile.txt' -ProtectedOutputFile 'c:\temp\ProtectedFile.whatever' -CopyProtectedStringToClipboard
 
 Converts the text file into a compressed/encrypted file, and also copies the AES-encrypted/compressed Base64 string into the clipboard.
 
+.EXAMPLE
+ConvertTo-ProtectedFile -UseClipboardInput -ProtectedOutputFile c:\temp\out-clipboard-string.protect
+
+Converts the text inside the clipboard into a compressed/encrypted file.
+
 .NOTES
+v1.1 - Added option to provide input string directly from Clipboard
+v1.0 - initial function
 #yossi_sassi, 1nTh35h311
 #>
 [cmdletbinding()]
     param (
-        [parameter(mandatory=$true)]
-        [string]$InputFile,
+        [parameter(ParameterSetName='FilePath')]
+        [string]$InputFilePath,
+        [parameter(ParameterSetName='Clipboard')]
+        [switch]$UseClipboardInput,
         [parameter(mandatory=$true)]
         [string]$ProtectedOutputFile,
         [switch]$CopyProtectedStringToClipboard
     )
 
-    # Step 1 - get payload from file -> exe, ps1, etc.
-    if (!(Test-Path $InputFile))
-        {
-            Write-Warning "[!] Cannot find input file";
-            break
+    # Step 0 - Validation: ensure at least one parameter is provided
+    if (-not $PSBoundParameters.ContainsKey('InputFilePath') -and -not $UseClipboardInput) {
+        Write-Warning "[!] You must specify either -InputFilePath string or -UseClipboardInput switch";
+        break
     }
 
+    # Get the input based on which parameter was used
+    if ($UseClipboardInput) {
+        $B = [text.encoding]::UTF8.GetBytes($(Get-Clipboard));
+        $PlainText = [convert]::ToBase64String($B);
+        Write-Host "[x] Using clipboard content"
+    }
+    # Test if the file path exists
+    elseif (Test-Path $InputFilePath) {
+        Write-Host "[x] File path exists: $InputFilePath"
+        # Get file bytes & encode to base64
+        $B = [io.file]::ReadAllBytes($InputFilePath);
+        $PlainText = [convert]::ToBase64String($B);
+    }
+    else {
+        Write-Warning "[!] Cannot find input file";
+        break
+    }
+
+    # Step 1 - get payload from file -> exe, ps1, etc.
     # Get passphrase securely from the prompt
     function Get-SecurePasswordForEncryption {
     param(
@@ -192,12 +223,8 @@ Converts the text file into a compressed/encrypted file, and also copies the AES
     # Get the DPAPI encrypted passphrase from the user
     $PassToEncrypt = Get-SecurePasswordForEncryption;
 
-    # Get file bytes & encode to base64
-    $B = [io.file]::ReadAllBytes($InputFile);
-    $b64 = [convert]::ToBase64String($B);
-
     # Protect file content with gzip+encryption
-    $ProtectedString  = Protect-String -PlainText $b64 -Passphrase $([Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::SecureStringToBSTR($PassToEncrypt)))
+    $ProtectedString  = Protect-String -PlainText $PlainText -Passphrase $([Runtime.InteropServices.Marshal]::PtrToStringUni([Runtime.InteropServices.Marshal]::SecureStringToBSTR($PassToEncrypt)))
 
     # save protected string to output file
     if ($?) {
@@ -224,7 +251,7 @@ Converts the text file into a compressed/encrypted file, and also copies the AES
         }
 }
 
-# ConvertFrom-ProtectedFile v1.0
+# ConvertFrom-ProtectedFile v1.1
 # UnProtect input file and save it to output path
 function ConvertFrom-ProtectedFile {
 <#
@@ -257,6 +284,8 @@ ConvertFrom-ProtectedFile -ProtectedInputFile C:\temp\Enc.txt -OutputFile C:\tem
 Converts the Base64 result file (originally produced using the ConvertTo-ProtectedFile function) into the original file (in this case, an exe).
 
 .NOTES
+v1.1 - Added option to copy unprotected/original plain-text to Clipboard
+v1.0 - initial function
 #yossi_sassi, 1nTh35h311
 #>
 [cmdletbinding()]
@@ -264,7 +293,8 @@ Converts the Base64 result file (originally produced using the ConvertTo-Protect
         [parameter(mandatory=$true)]
         [string]$ProtectedInputFile,
         [parameter(mandatory=$true)]
-        [string]$OutputFile
+        [string]$OutputFile,
+        [switch]$CopyUnProtectedStringToClipboard
     )
 
     function Get-SecurePasswordForDecryption {
@@ -297,4 +327,10 @@ Converts the Base64 result file (originally produced using the ConvertTo-Protect
         {
             Write-Warning "An error occured while trying to save unprotected file.`n$($Error[0].Exception.Message)"
         }
+    
+    if ($CopyUnProtectedStringToClipboard) {
+            $FileContent = Get-Content $OutputFile;
+            $FileContent | clip;
+            Write-Host "[x] Successfully copied UnProtected string to clipboard." -ForegroundColor Magenta    
+    }
 }
