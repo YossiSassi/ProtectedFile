@@ -5,7 +5,7 @@ Can be used for simple privacy stuff, as well as to avoid issues with CD&R paylo
 Main functions: ConvertTo-ProtectedFile, ConvertFrom-ProtectedFile
 Inner functions: Protect-String, Unprotect-String
 
-Module Version: 1.0
+Module Version: 1.1
 Comments: yossis@protonmail.com (#Yossi_Sassi, 1nTh35h311)
 Special thanks to Eldar Azan for his feedback!
 #>
